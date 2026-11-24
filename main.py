@@ -6,7 +6,8 @@ from flask import Flask, request, jsonify, abort
 
 app = Flask(__name__)
 
-BOT_TOKEN = os.getenv("9159159164:AAE-nqw-jpjV9K8ZEwkuWc5RKENwH2A73Po")
+# Environment variable "BOT_TOKEN" ရှိရင် အဲဒါကို သုံးမယ်၊ မရှိရင် ဘေးက fallback token ကို သုံးမယ်
+BOT_TOKEN = os.getenv("BOT_TOKEN") or "9159159164:AAE-nqw-jpjV9K8ZEwkuWc5RKENwH2A73Po"
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
 RENDER_URL = os.getenv("RENDER_EXTERNAL_URL")
 
@@ -18,9 +19,10 @@ logger = logging.getLogger(__name__)
 
 def send_message(chat_id, text):
     if not API_URL:
+        logger.warning("BOT_TOKEN is missing.")
         return
 
-    requests.post(
+    response = requests.post(
         f"{API_URL}/sendMessage",
         json={
             "chat_id": chat_id,
@@ -28,7 +30,8 @@ def send_message(chat_id, text):
             "parse_mode": "HTML"
         },
         timeout=15
-    ).raise_for_status()
+    )
+    response.raise_for_status()
 
 
 @app.route("/", methods=["GET"])
@@ -46,7 +49,7 @@ def webhook(secret):
 
     chat = message.get("chat", {})
     chat_id = chat.get("id")
-    text = message.get("text", "").strip()
+    text = (message.get("text") or "").strip()
 
     if not chat_id or not text:
         return jsonify(ok=True)
@@ -100,7 +103,8 @@ def setup_webhook():
         logger.warning("Webhook environment variables are missing.")
         return
 
-    url = f"{RENDER_URL}/webhook/{WEBHOOK_SECRET}"
+    base_url = RENDER_URL.rstrip("/")
+    url = f"{base_url}/webhook/{WEBHOOK_SECRET}"
 
     response = requests.post(
         f"{API_URL}/setWebhook",
@@ -112,3 +116,7 @@ def setup_webhook():
 
 
 setup_webhook()
+
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
